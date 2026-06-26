@@ -174,6 +174,91 @@ def createGridfinityBaseplate(input: BaseplateGeneratorInput, targetComponent: a
         )
         extraCutoutBodies = extraCutoutBodies + holeCuttingBodies + list(magnetScrewCutoutsPattern.bodies)
 
+    if input.hasExtendedBottom and input.hasMagnetCutouts and input.hasGlueChannels:
+        magnetRadius = input.magnetCutoutsDiameter / 2
+        channelOverlap = magnetRadius * 0.3
+        channelTotalRadialLength = input.glueChannelDepth + channelOverlap
+        halfLen = channelTotalRadialLength / 2
+        halfWidth = input.glueChannelWidth / 2
+
+        patternSpacingX = input.baseWidth - const.DIMENSION_SCREW_HOLES_OFFSET * 2
+        patternSpacingY = input.baseLength - const.DIMENSION_SCREW_HOLES_OFFSET * 2
+
+        # 4 hole positions with direction away from center (toward outer walls)
+        holeConfigs = [
+            (holeCenterPoint.x, holeCenterPoint.y, -1, -1),
+            (holeCenterPoint.x + patternSpacingX, holeCenterPoint.y, 1, -1),
+            (holeCenterPoint.x, holeCenterPoint.y + patternSpacingY, -1, 1),
+            (holeCenterPoint.x + patternSpacingX, holeCenterPoint.y + patternSpacingY, 1, 1),
+        ]
+
+        for hx, hy, dx, dy in holeConfigs:
+            mag = math.sqrt(dx * dx + dy * dy)
+            dirX, dirY = dx / mag, dy / mag
+            perpX, perpY = -dirY, dirX
+
+            # center of channel rectangle at the magnet circle edge
+            cx = hx + magnetRadius * dirX
+            cy = hy + magnetRadius * dirY
+
+            # 4 corners of rotated rectangle
+            p1x = cx - halfLen * dirX - halfWidth * perpX
+            p1y = cy - halfLen * dirY - halfWidth * perpY
+            p2x = cx + halfLen * dirX - halfWidth * perpX
+            p2y = cy + halfLen * dirY - halfWidth * perpY
+            p3x = cx + halfLen * dirX + halfWidth * perpX
+            p3y = cy + halfLen * dirY + halfWidth * perpY
+            p4x = cx - halfLen * dirX + halfWidth * perpX
+            p4y = cy - halfLen * dirY + halfWidth * perpY
+
+            channelPlaneInput: adsk.fusion.ConstructionPlaneInput = targetComponent.constructionPlanes.createInput()
+            channelPlaneInput.setByOffset(targetComponent.xYConstructionPlane, adsk.core.ValueInput.createByReal(-const.BIN_BASE_HEIGHT))
+            channelPlane = targetComponent.constructionPlanes.add(channelPlaneInput)
+            channelPlane.isLightBulbOn = False
+
+            channelSketch: adsk.fusion.Sketch = targetComponent.sketches.add(channelPlane)
+            channelSketch.name = "Glue escape channel"
+
+            sp1 = channelSketch.modelToSketchSpace(adsk.core.Point3D.create(p1x, p1y, 0))
+            sp2 = channelSketch.modelToSketchSpace(adsk.core.Point3D.create(p2x, p2y, 0))
+            sp3 = channelSketch.modelToSketchSpace(adsk.core.Point3D.create(p3x, p3y, 0))
+            sp4 = channelSketch.modelToSketchSpace(adsk.core.Point3D.create(p4x, p4y, 0))
+            sp1.z = 0; sp2.z = 0; sp3.z = 0; sp4.z = 0
+
+            lines = channelSketch.sketchCurves.sketchLines
+            lines.addByTwoPoints(sp1, sp2)
+            lines.addByTwoPoints(sp2, sp3)
+            lines.addByTwoPoints(sp3, sp4)
+            lines.addByTwoPoints(sp4, sp1)
+
+            channelExtrude = extrudeUtils.simpleDistanceExtrude(
+                channelSketch.profiles.item(0),
+                adsk.fusion.FeatureOperations.NewBodyFeatureOperation,
+                input.magnetCutoutsDepth,
+                adsk.fusion.ExtentDirections.NegativeExtentDirection,
+                [],
+                targetComponent,
+            )
+            channelExtrude.name = "Glue escape channel"
+            extraCutoutBodies.append(channelExtrude.bodies.item(0))
+
+            # semicircle cap at the outer end of the rectangle
+            capCenterPoint = adsk.core.Point3D.create(
+                cx + halfLen * dirX,
+                cy + halfLen * dirY,
+                0,
+            )
+            capBody = shapeUtils.simpleCylinder(
+                faceUtils.getBottomFace(baseBody),
+                0,
+                input.magnetCutoutsDepth,
+                halfWidth,
+                capCenterPoint,
+                targetComponent,
+            )
+            capBody.name = "Glue channel cap"
+            extraCutoutBodies.append(capBody)
+
     if len(extraCutoutBodies) > 0:
         combineUtils.joinBodies(
             baseBody,
@@ -322,13 +407,157 @@ def createGridfinityBaseplate(input: BaseplateGeneratorInput, targetComponent: a
         baseplateBottomLayerBody = baseplateBottomLayer.bodies.item(0)
         combineUtils.joinBodies(binInterfaceBody, commonUtils.objectCollectionFromList([baseplateBottomLayerBody]), targetComponent)
 
-    bottomChamfer = filletUtils.chamferEdgesByLength(
-        [faceUtils.getBottomFace(binInterfaceBody)],
-        0.05,
-        baseplateTrueLength + (input.paddingTop + input.paddingBottom if input.hasPadding else 0),
-        const.BIN_CORNER_FILLET_RADIUS * 3,
-        targetComponent,
-    )
+    # Locking tabs — shared setup
+    hasAnyTab = (input.tabLeftType != const.TAB_TYPE_NONE
+        or input.tabRightType != const.TAB_TYPE_NONE
+        or input.tabTopType != const.TAB_TYPE_NONE
+        or input.tabBottomType != const.TAB_TYPE_NONE)
+
+    if hasAnyTab and input.hasExtendedBottom:
+        tabHeight = const.DIMENSION_TAB_HEIGHT
+        tabBaseWidth = const.DIMENSION_TAB_BASE_WIDTH
+        tabAngleRad = math.radians(const.DIMENSION_TAB_ANGLE_DEG)
+        tabTipWidth = tabBaseWidth + 2.0 * tabHeight / math.tan(tabAngleRad)
+        cl = input.tabClearance
+
+        edgeLeft = -(input.paddingLeft if input.hasPadding else 0)
+        edgeRight = baseplateTrueWidth + (input.paddingRight if input.hasPadding else 0)
+        edgeBottom = -(input.paddingBottom if input.hasPadding else 0)
+        edgeTop = baseplateTrueLength + (input.paddingTop if input.hasPadding else 0)
+
+        def _createTabBody(cx, cy, bw, tw, h, axis, sign, targetComponent, applyFillet=True):
+            tabZHeight = const.DIMENSION_TAB_HEIGHT
+            filletRadius = 0.05
+
+            extBottomTop = -const.BIN_BASE_HEIGHT
+            extBottomBot = -(const.BIN_BASE_HEIGHT + input.bottomExtensionHeight)
+            tabTopZ = (extBottomTop + extBottomBot) / 2 + tabZHeight / 2
+
+            planeInput: adsk.fusion.ConstructionPlaneInput = targetComponent.constructionPlanes.createInput()
+            planeInput.setByOffset(targetComponent.xYConstructionPlane, adsk.core.ValueInput.createByReal(tabTopZ))
+            plane = targetComponent.constructionPlanes.add(planeInput)
+            plane.isLightBulbOn = False
+            sketch: adsk.fusion.Sketch = targetComponent.sketches.add(plane)
+            sketch.name = "Locking tab"
+
+            if axis == 'x':
+                pts = [
+                    adsk.core.Point3D.create(cx - bw / 2, cy, 0),
+                    adsk.core.Point3D.create(cx + bw / 2, cy, 0),
+                    adsk.core.Point3D.create(cx + tw / 2, cy + sign * h, 0),
+                    adsk.core.Point3D.create(cx - tw / 2, cy + sign * h, 0),
+                ]
+            else:
+                pts = [
+                    adsk.core.Point3D.create(cx, cy - bw / 2, 0),
+                    adsk.core.Point3D.create(cx, cy + bw / 2, 0),
+                    adsk.core.Point3D.create(cx + sign * h, cy + tw / 2, 0),
+                    adsk.core.Point3D.create(cx + sign * h, cy - tw / 2, 0),
+                ]
+
+            spts = []
+            for p in pts:
+                sp = sketch.modelToSketchSpace(p)
+                sp.z = 0
+                spts.append(sp)
+
+            lines = sketch.sketchCurves.sketchLines
+            lines.addByTwoPoints(spts[0], spts[1])
+            lines.addByTwoPoints(spts[1], spts[2])
+            lines.addByTwoPoints(spts[2], spts[3])
+            lines.addByTwoPoints(spts[3], spts[0])
+
+            ext = extrudeUtils.simpleDistanceExtrude(
+                sketch.profiles.item(0),
+                adsk.fusion.FeatureOperations.NewBodyFeatureOperation,
+                tabZHeight,
+                adsk.fusion.ExtentDirections.NegativeExtentDirection,
+                [],
+                targetComponent,
+            )
+            ext.name = "Locking tab"
+            body = ext.bodies.item(0)
+
+            if applyFillet:
+                try:
+                    tol = 0.001
+                    minZ = min(v.geometry.z for v in body.vertices)
+                    edges = adsk.core.ObjectCollection.create()
+                    for edge in body.edges:
+                        sv = edge.startVertex.geometry
+                        ev = edge.endVertex.geometry
+                        # Skip mating face edges
+                        if axis == 'x':
+                            onMatingFace = abs(sv.y - cy) < tol and abs(ev.y - cy) < tol
+                        else:
+                            onMatingFace = abs(sv.x - cx) < tol and abs(ev.x - cx) < tol
+                        # Skip bottom face edges
+                        onBottomFace = abs(sv.z - minZ) < tol and abs(ev.z - minZ) < tol
+                        if not onMatingFace and not onBottomFace:
+                            edges.add(edge)
+                    if edges.count > 0:
+                        filletFeatures = targetComponent.features.filletFeatures
+                        filletInput = filletFeatures.createInput()
+                        filletInput.addConstantRadiusEdgeSet(edges, adsk.core.ValueInput.createByReal(filletRadius), True)
+                        filletFeatures.add(filletInput)
+                except:
+                    pass
+            return body
+
+        def _createTabsForEdge(tabType, edgeCoord, axis, numUnits, unitSize, onlyType=None):
+            if tabType == const.TAB_TYPE_NONE:
+                return
+            if onlyType is not None and tabType != onlyType:
+                return
+            isMale = tabType == const.TAB_TYPE_MALE
+            tabBodies = []
+            for u in range(int(numUnits)):
+                for i in range(2):
+                    centerAlongEdge = u * unitSize + (2 * i + 1) * unitSize / 4 - input.xyClearance
+                    if isMale:
+                        bw, tw, h = tabBaseWidth, tabTipWidth, tabHeight
+                        if axis == 'x':
+                            sign = -1 if edgeCoord <= baseplateTrueLength / 2 else 1
+                        else:
+                            sign = -1 if edgeCoord <= baseplateTrueWidth / 2 else 1
+                    else:
+                        # Female: narrow opening at surface, widens inward (matches male tab)
+                        bw = tabBaseWidth + 2 * cl
+                        tw = tabTipWidth + 2 * cl
+                        h = tabHeight + cl
+                        if axis == 'x':
+                            sign = 1 if edgeCoord <= baseplateTrueLength / 2 else -1
+                        else:
+                            sign = 1 if edgeCoord <= baseplateTrueWidth / 2 else -1
+                    if axis == 'x':
+                        body = _createTabBody(centerAlongEdge, edgeCoord, bw, tw, h, axis, sign, targetComponent, applyFillet=True)
+                    else:
+                        body = _createTabBody(edgeCoord, centerAlongEdge, bw, tw, h, axis, sign, targetComponent, applyFillet=True)
+                    tabBodies.append(body)
+            if len(tabBodies) > 0:
+                bodyCollection = commonUtils.objectCollectionFromList(tabBodies)
+                if isMale:
+                    combineUtils.joinBodies(binInterfaceBody, bodyCollection, targetComponent)
+                else:
+                    combineUtils.cutBody(binInterfaceBody, bodyCollection, targetComponent)
+
+        # Create MALE tabs before chamfer so chamfer blends with tab edges
+        _createTabsForEdge(input.tabBottomType, edgeBottom, 'x', input.baseplateWidth, input.baseWidth, onlyType=const.TAB_TYPE_MALE)
+        _createTabsForEdge(input.tabTopType, edgeTop, 'x', input.baseplateWidth, input.baseWidth, onlyType=const.TAB_TYPE_MALE)
+        _createTabsForEdge(input.tabLeftType, edgeLeft, 'y', input.baseplateLength, input.baseLength, onlyType=const.TAB_TYPE_MALE)
+        _createTabsForEdge(input.tabRightType, edgeRight, 'y', input.baseplateLength, input.baseLength, onlyType=const.TAB_TYPE_MALE)
+
+        # Create FEMALE pockets before chamfer too so chamfer blends with pocket edges
+        _createTabsForEdge(input.tabBottomType, edgeBottom, 'x', input.baseplateWidth, input.baseWidth, onlyType=const.TAB_TYPE_FEMALE)
+        _createTabsForEdge(input.tabTopType, edgeTop, 'x', input.baseplateWidth, input.baseWidth, onlyType=const.TAB_TYPE_FEMALE)
+        _createTabsForEdge(input.tabLeftType, edgeLeft, 'y', input.baseplateLength, input.baseLength, onlyType=const.TAB_TYPE_FEMALE)
+        _createTabsForEdge(input.tabRightType, edgeRight, 'y', input.baseplateLength, input.baseLength, onlyType=const.TAB_TYPE_FEMALE)
+
+    bottomFace = faceUtils.getBottomFace(binInterfaceBody)
+    allBottomEdges = adsk.core.ObjectCollection.create()
+    for edge in bottomFace.edges:
+        allBottomEdges.add(edge)
+    bottomChamfer = filletUtils.createChamfer(allBottomEdges, 0.05, targetComponent)
     bottomChamfer.name = "Bottom chamfer"
 
     if not connectionHoleYTool is None and not connectionHoleXTool is None:

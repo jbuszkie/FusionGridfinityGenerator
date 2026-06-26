@@ -72,6 +72,10 @@ BASEPLATE_WITH_MAGNETS_INPUT = 'with_magnet_cutouts'
 BASEPLATE_MAGNET_DIAMETER_INPUT = 'magnet_diameter'
 BASEPLATE_MAGNET_HEIGHT_INPUT = 'magnet_height'
 
+BASEPLATE_WITH_GLUE_CHANNELS_INPUT = 'with_glue_channels'
+BASEPLATE_GLUE_CHANNEL_WIDTH_INPUT = 'glue_channel_width'
+BASEPLATE_GLUE_CHANNEL_DEPTH_INPUT = 'glue_channel_depth'
+
 BASEPLATE_WITH_SCREWS_INPUT = 'with_screw_holes'
 BASEPLATE_SCREW_DIAMETER_INPUT = 'screw_diameter'
 BASEPLATE_SCREW_HEIGHT_INPUT = 'screw_head_diameter'
@@ -86,6 +90,17 @@ BASEPLATE_EXTRA_THICKNESS_INPUT = 'extra_bottom_thickness'
 BASEPLATE_BIN_Z_CLEARANCE_INPUT = 'bin_z_clearance'
 BASEPLATE_HAS_CONNECTION_HOLE_INPUT = 'has_connection_hole'
 BASEPLATE_CONNECTION_HOLE_DIAMETER_INPUT = 'connection_hole_diameter'
+
+LOCKING_TABS_GROUP = 'locking_tabs_group'
+BASEPLATE_TAB_LEFT_INPUT = 'tab_left_type'
+BASEPLATE_TAB_RIGHT_INPUT = 'tab_right_type'
+BASEPLATE_TAB_TOP_INPUT = 'tab_top_type'
+BASEPLATE_TAB_BOTTOM_INPUT = 'tab_bottom_type'
+BASEPLATE_TAB_CLEARANCE_INPUT = 'tab_clearance'
+
+TAB_TYPE_NONE = 'None'
+TAB_TYPE_MALE = 'Male'
+TAB_TYPE_FEMALE = 'Female'
 
 INPUT_CHANGES_SAVE_DEFAULTS = 'input_changes_buttons_save_new_defaults'
 INPUT_CHANGES_RESET_TO_DEFAULTS = 'input_changes_button_reset_to_defaults'
@@ -231,6 +246,22 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     magnetSocketDepthInput = magnetCutoutGroup.children.addValueInput(BASEPLATE_MAGNET_HEIGHT_INPUT, 'Magnet cutout depth', defaultLengthUnits, adsk.core.ValueInput.createByReal(uiState.getState(BASEPLATE_MAGNET_HEIGHT_INPUT)))
     uiState.registerCommandInput(magnetSocketDepthInput)
 
+    generateGlueChannelsInput = magnetCutoutGroup.children.addBoolValueInput(BASEPLATE_WITH_GLUE_CHANNELS_INPUT, 'Add glue/air channels', True, '', uiState.getState(BASEPLATE_WITH_GLUE_CHANNELS_INPUT))
+    generateGlueChannelsInput.tooltip = "Small notches at the edge of each magnet hole for air/glue escape"
+    uiState.registerCommandInput(generateGlueChannelsInput)
+    glueChannelWidthInput = magnetCutoutGroup.children.addValueInput(BASEPLATE_GLUE_CHANNEL_WIDTH_INPUT, 'Channel width', defaultLengthUnits, adsk.core.ValueInput.createByReal(uiState.getState(BASEPLATE_GLUE_CHANNEL_WIDTH_INPUT)))
+    glueChannelWidthInput.minimumValue = 0.05
+    glueChannelWidthInput.isMinimumInclusive = True
+    glueChannelWidthInput.maximumValue = 0.5
+    glueChannelWidthInput.isMaximumInclusive = True
+    uiState.registerCommandInput(glueChannelWidthInput)
+    glueChannelDepthInput = magnetCutoutGroup.children.addValueInput(BASEPLATE_GLUE_CHANNEL_DEPTH_INPUT, 'Channel depth', defaultLengthUnits, adsk.core.ValueInput.createByReal(uiState.getState(BASEPLATE_GLUE_CHANNEL_DEPTH_INPUT)))
+    glueChannelDepthInput.minimumValue = 0.02
+    glueChannelDepthInput.isMinimumInclusive = True
+    glueChannelDepthInput.maximumValue = 0.3
+    glueChannelDepthInput.isMaximumInclusive = True
+    uiState.registerCommandInput(glueChannelDepthInput)
+
     screwHoleGroup = plateFeaturesGroup.children.addGroupCommandInput(SCREW_HOLE_GROUP, 'Screw holes')
     screwHoleGroup.isExpanded = uiState.getState(SCREW_HOLE_GROUP)
     uiState.registerCommandInput(screwHoleGroup)
@@ -304,7 +335,47 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     connectionHoleSizeInput.maximumValue = 0.5
     connectionHoleSizeInput.isMaximumInclusive = True
     uiState.registerCommandInput(connectionHoleSizeInput)
-    
+
+    lockingTabsGroup = plateFeaturesGroup.children.addGroupCommandInput(LOCKING_TABS_GROUP, 'Locking tabs')
+    lockingTabsGroup.isExpanded = uiState.getState(LOCKING_TABS_GROUP)
+    uiState.registerCommandInput(lockingTabsGroup)
+
+    tabLeftDropdown = lockingTabsGroup.children.addDropDownCommandInput(BASEPLATE_TAB_LEFT_INPUT, 'Left edge (X min)', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+    tabLeftState = uiState.getState(BASEPLATE_TAB_LEFT_INPUT)
+    tabLeftDropdown.listItems.add(TAB_TYPE_NONE, tabLeftState == TAB_TYPE_NONE)
+    tabLeftDropdown.listItems.add(TAB_TYPE_MALE, tabLeftState == TAB_TYPE_MALE)
+    tabLeftDropdown.listItems.add(TAB_TYPE_FEMALE, tabLeftState == TAB_TYPE_FEMALE)
+    uiState.registerCommandInput(tabLeftDropdown)
+
+    tabRightDropdown = lockingTabsGroup.children.addDropDownCommandInput(BASEPLATE_TAB_RIGHT_INPUT, 'Right edge (X max)', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+    tabRightState = uiState.getState(BASEPLATE_TAB_RIGHT_INPUT)
+    tabRightDropdown.listItems.add(TAB_TYPE_NONE, tabRightState == TAB_TYPE_NONE)
+    tabRightDropdown.listItems.add(TAB_TYPE_MALE, tabRightState == TAB_TYPE_MALE)
+    tabRightDropdown.listItems.add(TAB_TYPE_FEMALE, tabRightState == TAB_TYPE_FEMALE)
+    uiState.registerCommandInput(tabRightDropdown)
+
+    tabTopDropdown = lockingTabsGroup.children.addDropDownCommandInput(BASEPLATE_TAB_TOP_INPUT, 'Top edge (Y max)', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+    tabTopState = uiState.getState(BASEPLATE_TAB_TOP_INPUT)
+    tabTopDropdown.listItems.add(TAB_TYPE_NONE, tabTopState == TAB_TYPE_NONE)
+    tabTopDropdown.listItems.add(TAB_TYPE_MALE, tabTopState == TAB_TYPE_MALE)
+    tabTopDropdown.listItems.add(TAB_TYPE_FEMALE, tabTopState == TAB_TYPE_FEMALE)
+    uiState.registerCommandInput(tabTopDropdown)
+
+    tabBottomDropdown = lockingTabsGroup.children.addDropDownCommandInput(BASEPLATE_TAB_BOTTOM_INPUT, 'Bottom edge (Y min)', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+    tabBottomState = uiState.getState(BASEPLATE_TAB_BOTTOM_INPUT)
+    tabBottomDropdown.listItems.add(TAB_TYPE_NONE, tabBottomState == TAB_TYPE_NONE)
+    tabBottomDropdown.listItems.add(TAB_TYPE_MALE, tabBottomState == TAB_TYPE_MALE)
+    tabBottomDropdown.listItems.add(TAB_TYPE_FEMALE, tabBottomState == TAB_TYPE_FEMALE)
+    uiState.registerCommandInput(tabBottomDropdown)
+
+    tabClearanceInput = lockingTabsGroup.children.addValueInput(BASEPLATE_TAB_CLEARANCE_INPUT, 'Tab clearance/tolerance', defaultLengthUnits, adsk.core.ValueInput.createByReal(uiState.getState(BASEPLATE_TAB_CLEARANCE_INPUT)))
+    tabClearanceInput.minimumValue = 0
+    tabClearanceInput.isMinimumInclusive = True
+    tabClearanceInput.maximumValue = 0.2
+    tabClearanceInput.isMaximumInclusive = True
+    tabClearanceInput.tooltip = "Extra space added to female slots for printer tolerance"
+    uiState.registerCommandInput(tabClearanceInput)
+
     inputChangesGroup = inputs.addGroupCommandInput(INPUT_CHANGES_GROUP, 'Inputs')
     inputChangesGroup.isExpanded = uiState.getState(INPUT_CHANGES_GROUP)
     uiState.registerCommandInput(inputChangesGroup)
@@ -444,6 +515,9 @@ def generateBaseplate(args: adsk.core.CommandEventArgs):
         baseplateGeneratorInput.hasMagnetCutouts = inputsState.hasMagnetSockets
         baseplateGeneratorInput.magnetCutoutsDiameter = inputsState.magnetSocketSize
         baseplateGeneratorInput.magnetCutoutsDepth = inputsState.magnetSocketDepth
+        baseplateGeneratorInput.hasGlueChannels = inputsState.hasGlueChannels
+        baseplateGeneratorInput.glueChannelWidth = inputsState.glueChannelWidth
+        baseplateGeneratorInput.glueChannelDepth = inputsState.glueChannelDepth
         baseplateGeneratorInput.hasScrewHoles = inputsState.hasScrewHoles
         baseplateGeneratorInput.screwHolesDiameter = inputsState.screwHoleSize
         baseplateGeneratorInput.screwHeadCutoutDiameter = inputsState.screwHeadSize
@@ -456,6 +530,11 @@ def generateBaseplate(args: adsk.core.CommandEventArgs):
         baseplateGeneratorInput.binZClearance = inputsState.verticalClearance
         baseplateGeneratorInput.hasConnectionHoles = inputsState.hasConnectionHoles
         baseplateGeneratorInput.connectionScrewHolesDiameter = inputsState.connectionHoleSize
+        baseplateGeneratorInput.tabLeftType = inputsState.tabLeftType
+        baseplateGeneratorInput.tabRightType = inputsState.tabRightType
+        baseplateGeneratorInput.tabTopType = inputsState.tabTopType
+        baseplateGeneratorInput.tabBottomType = inputsState.tabBottomType
+        baseplateGeneratorInput.tabClearance = inputsState.tabClearance
         baseplateGeneratorInput.cornerFilletRadius = const.BIN_CORNER_FILLET_RADIUS
 
         baseplateBody = createGridfinityBaseplate(baseplateGeneratorInput, gridfinityBaseplateComponent)
@@ -499,6 +578,10 @@ def initUiState():
 
     uiState.initValue(BASEPLATE_MAGNET_DIAMETER_INPUT, const.DIMENSION_MAGNET_CUTOUT_DIAMETER, adsk.core.ValueCommandInput.classType())
     uiState.initValue(BASEPLATE_MAGNET_HEIGHT_INPUT, const.DIMENSION_MAGNET_CUTOUT_DEPTH, adsk.core.ValueCommandInput.classType())
+
+    uiState.initValue(BASEPLATE_WITH_GLUE_CHANNELS_INPUT, False, adsk.core.BoolValueCommandInput.classType())
+    uiState.initValue(BASEPLATE_GLUE_CHANNEL_WIDTH_INPUT, const.DIMENSION_MAGNET_CHANNEL_WIDTH, adsk.core.ValueCommandInput.classType())
+    uiState.initValue(BASEPLATE_GLUE_CHANNEL_DEPTH_INPUT, const.DIMENSION_MAGNET_CHANNEL_DEPTH, adsk.core.ValueCommandInput.classType())
     uiState.initValue(BASEPLATE_WITH_SCREWS_INPUT, True, adsk.core.BoolValueCommandInput.classType())
 
     uiState.initValue(BASEPLATE_WITH_SIDE_PADDING_INPUT, False, adsk.core.BoolValueCommandInput.classType())
@@ -515,6 +598,13 @@ def initUiState():
     uiState.initValue(BASEPLATE_HAS_CONNECTION_HOLE_INPUT, False, adsk.core.BoolValueCommandInput.classType())
     uiState.initValue(BASEPLATE_CONNECTION_HOLE_DIAMETER_INPUT, const.DIMENSION_PLATE_CONNECTION_SCREW_HOLE_DIAMETER, adsk.core.ValueCommandInput.classType())
     uiState.initValue(SHOW_PREVIEW_INPUT, False, adsk.core.BoolValueCommandInput.classType())
+
+    uiState.initValue(LOCKING_TABS_GROUP, True, adsk.core.GroupCommandInput.classType())
+    uiState.initValue(BASEPLATE_TAB_LEFT_INPUT, TAB_TYPE_NONE, adsk.core.DropDownCommandInput.classType())
+    uiState.initValue(BASEPLATE_TAB_RIGHT_INPUT, TAB_TYPE_NONE, adsk.core.DropDownCommandInput.classType())
+    uiState.initValue(BASEPLATE_TAB_TOP_INPUT, TAB_TYPE_NONE, adsk.core.DropDownCommandInput.classType())
+    uiState.initValue(BASEPLATE_TAB_BOTTOM_INPUT, TAB_TYPE_NONE, adsk.core.DropDownCommandInput.classType())
+    uiState.initValue(BASEPLATE_TAB_CLEARANCE_INPUT, const.DIMENSION_TAB_CLEARANCE, adsk.core.ValueCommandInput.classType())
 
     recordedDefaults = configUtils.readJsonConfig(UI_INPUT_DEFAULTS_CONFIG_PATH)
     if recordedDefaults:
@@ -550,6 +640,9 @@ def getInputsState():
         uiState.getState(BASEPLATE_WITH_MAGNETS_INPUT),
         uiState.getState(BASEPLATE_MAGNET_DIAMETER_INPUT),
         uiState.getState(BASEPLATE_MAGNET_HEIGHT_INPUT),
+        uiState.getState(BASEPLATE_WITH_GLUE_CHANNELS_INPUT),
+        uiState.getState(BASEPLATE_GLUE_CHANNEL_WIDTH_INPUT),
+        uiState.getState(BASEPLATE_GLUE_CHANNEL_DEPTH_INPUT),
         uiState.getState(BASEPLATE_WITH_SCREWS_INPUT),
         uiState.getState(BASEPLATE_SCREW_DIAMETER_INPUT),
         uiState.getState(BASEPLATE_SCREW_HEIGHT_INPUT),
@@ -562,4 +655,9 @@ def getInputsState():
         uiState.getState(BASEPLATE_BIN_Z_CLEARANCE_INPUT),
         uiState.getState(BASEPLATE_HAS_CONNECTION_HOLE_INPUT),
         uiState.getState(BASEPLATE_CONNECTION_HOLE_DIAMETER_INPUT),
+        uiState.getState(BASEPLATE_TAB_LEFT_INPUT),
+        uiState.getState(BASEPLATE_TAB_RIGHT_INPUT),
+        uiState.getState(BASEPLATE_TAB_TOP_INPUT),
+        uiState.getState(BASEPLATE_TAB_BOTTOM_INPUT),
+        uiState.getState(BASEPLATE_TAB_CLEARANCE_INPUT),
     )

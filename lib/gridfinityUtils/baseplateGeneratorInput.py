@@ -10,6 +10,14 @@ class BaseplateGeneratorInput():
         self.screwHeadCutoutDiameter = const.DIMENSION_SCREW_HEAD_CUTOUT_DIAMETER
         self.magnetCutoutsDiameter = const.DIMENSION_MAGNET_CUTOUT_DIAMETER
         self.magnetCutoutsDepth = const.DIMENSION_MAGNET_CUTOUT_DEPTH
+        self.hasGlueChannels = False
+        self.glueChannelWidth = const.DIMENSION_MAGNET_CHANNEL_WIDTH
+        self.glueChannelDepth = const.DIMENSION_MAGNET_CHANNEL_DEPTH
+        self.tabLeftType = const.TAB_TYPE_NONE
+        self.tabRightType = const.TAB_TYPE_NONE
+        self.tabTopType = const.TAB_TYPE_NONE
+        self.tabBottomType = const.TAB_TYPE_NONE
+        self.tabClearance = const.DIMENSION_TAB_CLEARANCE
         self.hasSkeletonizedBottom = True
         self.bottomExtensionHeight = const.BASEPLATE_EXTRA_HEIGHT
         self.xyClearance = const.BIN_XY_CLEARANCE
@@ -200,3 +208,67 @@ class BaseplateGeneratorInput():
     @magnetCutoutsDepth.setter
     def magnetCutoutsDepth(self, value: float):
         self._magnetCutoutsDepth = value
+
+    @property
+    def hasGlueChannels(self) -> bool:
+        return self._hasGlueChannels
+
+    @hasGlueChannels.setter
+    def hasGlueChannels(self, value: bool):
+        self._hasGlueChannels = value
+
+    @property
+    def glueChannelWidth(self) -> float:
+        return self._glueChannelWidth
+
+    @glueChannelWidth.setter
+    def glueChannelWidth(self, value: float):
+        self._glueChannelWidth = value
+
+    @property
+    def glueChannelDepth(self) -> float:
+        return self._glueChannelDepth
+
+    @glueChannelDepth.setter
+    def glueChannelDepth(self, value: float):
+        self._glueChannelDepth = value
+
+    @property
+    def tabLeftType(self) -> str:
+        return self._tabLeftType
+
+    @tabLeftType.setter
+    def tabLeftType(self, value: str):
+        self._tabLeftType = value
+
+    @property
+    def tabRightType(self) -> str:
+        return self._tabRightType
+
+    @tabRightType.setter
+    def tabRightType(self, value: str):
+        self._tabRightType = value
+
+    @property
+    def tabTopType(self) -> str:
+        return self._tabTopType
+
+    @tabTopType.setter
+    def tabTopType(self, value: str):
+        self._tabTopType = value
+
+    @property
+    def tabBottomType(self) -> str:
+        return self._tabBottomType
+
+    @tabBottomType.setter
+    def tabBottomType(self, value: str):
+        self._tabBottomType = value
+
+    @property
+    def tabClearance(self) -> float:
+        return self._tabClearance
+
+    @tabClearance.setter
+    def tabClearance(self, value: float):
+        self._tabClearance = value

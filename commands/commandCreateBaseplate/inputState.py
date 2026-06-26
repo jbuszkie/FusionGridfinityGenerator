@@ -15,6 +15,10 @@ class InputState:
     magnetSocketSize: float
     magnetSocketDepth: float
 
+    hasGlueChannels: bool
+    glueChannelWidth: float
+    glueChannelDepth: float
+
     hasScrewHoles: bool
     screwHoleSize: float
     screwHeadSize: float
@@ -30,3 +34,9 @@ class InputState:
 
     hasConnectionHoles: bool
     connectionHoleSize: float
+
+    tabLeftType: str
+    tabRightType: str
+    tabTopType: str
+    tabBottomType: str
+    tabClearance: float

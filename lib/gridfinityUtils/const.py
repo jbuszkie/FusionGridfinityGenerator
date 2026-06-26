@@ -40,5 +40,19 @@ DIMENSION_MAGNET_CUTOUT_DIAMETER = 0.65
 DIMENSION_MAGNET_CUTOUT_DEPTH = 0.24
 DIMENSION_PRINT_HELPER_GROOVE_DEPTH = 0.03
 
+# Magnet hole glue/air escape channel defaults
+DIMENSION_MAGNET_CHANNEL_WIDTH = 0.2
+DIMENSION_MAGNET_CHANNEL_DEPTH = 0.05
+
+# Locking tab defaults (values in cm)
+DIMENSION_TAB_HEIGHT = 0.3        # 3mm protrusion from edge
+DIMENSION_TAB_BASE_WIDTH = 0.6    # 6mm narrow end at plate edge
+DIMENSION_TAB_ANGLE_DEG = 60      # degrees from horizontal
+DIMENSION_TAB_CLEARANCE = 0.05    # 0.5mm tolerance for female slot
+
+TAB_TYPE_NONE = 'None'
+TAB_TYPE_MALE = 'Male'
+TAB_TYPE_FEMALE = 'Female'
+
 
 DEFAULT_FILTER_TOLERANCE = 0.00001
